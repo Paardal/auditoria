@@ -1,0 +1,134 @@
+package com.example.auditoria;
+
+import android.os.Bundle;
+import androidx.appcompat.app.AppCompatActivity;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.TextView;
+import android.view.View;
+import android.content.Intent;
+import android.net.Uri;
+import android.util.Log;
+import android.view.KeyEvent;
+import com.google.mlkit.vision.barcode.Barcode;
+import com.google.mlkit.vision.barcode.BarcodeScanning;
+import com.google.mlkit.vision.common.InputImage;
+import android.graphics.Bitmap;
+import java.io.IOException;
+import java.util.HashMap;
+
+public class MainActivity extends AppCompatActivity {
+    private static final int FILE_SELECT_CODE = 1;
+    private static final int BARCODE_SCAN_CODE = 2;
+    private EditText editTextProduto, editTextQuantidade;
+    private TextView textViewResultado;
+    private Button buttonAuditar, buttonImportar, buttonRelatorio, buttonExportar, buttonScanner;
+    private HashMap<String, Integer> contagemEstoque;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+
+        editTextProduto = findViewById(R.id.editTextProduto);
+        editTextQuantidade = findViewById(R.id.editTextQuantidade);
+        textViewResultado = findViewById(R.id.textViewResultado);
+        buttonAuditar = findViewById(R.id.buttonAuditar);
+        buttonImportar = findViewById(R.id.buttonImportar);
+        buttonRelatorio = findViewById(R.id.buttonRelatorio);
+        buttonExportar = findViewById(R.id.buttonExportar);
+        buttonScanner = findViewById(R.id.buttonScanner);
+        contagemEstoque = new HashMap<>();
+
+        buttonAuditar.setOnClickListener(v -> {
+            String produto = editTextProduto.getText().toString();
+            String quantidadeStr = editTextQuantidade.getText().toString();
+            if (!quantidadeStr.isEmpty()) {
+                int quantidade = Integer.parseInt(quantidadeStr);
+                auditarProduto(produto, quantidade);
+            } else {
+                textViewResultado.setText("Por favor, insira uma quantidade válida.");
+            }
+        });
+
+        buttonImportar.setOnClickListener(v -> abrirSeletorDeArquivo());
+        buttonRelatorio.setOnClickListener(v -> gerarRelatorio());
+        buttonExportar.setOnClickListener(v -> exportarAuditoria());
+        buttonScanner.setOnClickListener(v -> abrirScanner());
+    }
+
+    private void auditarProduto(String produto, int quantidade) {
+        if (produto.isEmpty()) {
+            textViewResultado.setText("Por favor, insira um nome de produto.");
+        } else {
+            contagemEstoque.put(produto, contagemEstoque.getOrDefault(produto, 0) + quantidade);
+            textViewResultado.setText("Auditoria realizada para: " + produto + " | Quantidade: " + contagemEstoque.get(produto));
+        }
+    }
+
+    private void abrirScanner() {
+        // Usando a Activity de scanner dedicada
+        Intent intent = new Intent(this, BarcodeScannerActivity.class);
+        startActivityForResult(intent, BARCODE_SCAN_CODE);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == FILE_SELECT_CODE && resultCode == RESULT_OK) {
+            Uri uri = data.getData();
+            if (uri != null) {
+                processarArquivo(uri);
+            }
+        } else if (requestCode == BARCODE_SCAN_CODE && resultCode == RESULT_OK) {
+            String codigo = data.getStringExtra("barcode");
+            if (codigo != null && !codigo.isEmpty()) {
+                processarCodigoDeBarras(codigo);
+            } else {
+                textViewResultado.setText("Erro ao escanear código.");
+            }
+        }
+    }
+
+    private void processarCodigoDeBarras(String codigo) {
+        auditarProduto(codigo, 1);
+        textViewResultado.setText("Código de barras escaneado: " + codigo);
+    }
+
+    private void abrirSeletorDeArquivo() {
+        Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+        intent.setType("text/*"); // Suporte para arquivos de texto, CSV, XML
+        startActivityForResult(intent, FILE_SELECT_CODE);
+    }
+
+    private void processarArquivo(Uri uri) {
+        // Processar arquivo TXT, CSV ou XML (implementar com OpenCSV ou outra lib)
+        Log.d("Arquivo", "Processando arquivo: " + uri.toString());
+        textViewResultado.setText("Arquivo processado: " + uri.toString());
+    }
+
+    private void gerarRelatorio() {
+        // Gerar relatório fictício (implementar conforme necessidade)
+        textViewResultado.setText("Relatório gerado!");
+    }
+
+    private void exportarAuditoria() {
+        // Lógica para exportar dados da auditoria (exemplo fictício)
+        textViewResultado.setText("Auditoria exportada!");
+    }
+
+    @Override
+    public boolean onKeyDown(int keyCode, KeyEvent event) {
+        // Capturar eventos do scanner físico (USB/Bluetooth) que envia o código no campo de texto
+        if (keyCode == KeyEvent.KEYCODE_ENTER) {
+            String codigo = editTextProduto.getText().toString().trim();
+            if (!codigo.isEmpty()) {
+                auditarProduto(codigo, 1);
+                textViewResultado.setText("Código escaneado via scanner: " + codigo);
+                editTextProduto.setText(""); // Limpar campo de produto após a leitura
+            }
+            return true; // Impede que o evento seja tratado mais tarde
+        }
+        return super.onKeyDown(keyCode, event);
+    }
+}
